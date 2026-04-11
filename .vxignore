@@ -1,0 +1,10 @@
+# VX ignore file — paths to exclude from local audit
+# Uses .gitignore syntax
+
+node_modules/
+vendor/
+.git/
+dist/
+build/
+*.min.js
+*.min.css

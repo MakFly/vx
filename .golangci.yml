@@ -1,0 +1,27 @@
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - typecheck
+
+issues:
+  exclude-rules:
+    # Relax some checks on test files
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosimple
+
+    # Intentionally unused psError struct used for XML unmarshalling in webservice.go
+    - path: pkg/modules/webservice\.go
+      linters:
+        - unused
+      text: "psError"

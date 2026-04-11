@@ -1,0 +1,23 @@
+# VX Security Scanner Configuration
+# Copy to vx.yaml in your project root
+
+target: https://your-app.com
+
+# Scan options
+threads: 10
+timeout: 15  # seconds
+
+# Module selection (empty = all)
+modules: []
+# modules: [headers, cookies, discovery, webservice, xss, info]
+
+# CI/CD
+ci:
+  min-score: 70
+  fail-on-score: true
+
+# Output
+output:
+  sarif: vx-results.sarif
+  badge: .github/vx-badge.json
+  json: vx-results.json

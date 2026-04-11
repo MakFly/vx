@@ -1,0 +1,32 @@
+# Binaries
+vx
+vx-linux-amd64
+vx-darwin-arm64
+vx.exe
+*.exe
+
+# Go
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/scan outputs
+*.sarif
+*.json
+!go.sum
+!package.json
+!vx.example.yaml
+/scans/
+
+# VX runtime
+.vx/
+.ig/

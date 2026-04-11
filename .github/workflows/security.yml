@@ -1,0 +1,39 @@
+# Example workflow — copy this to your project's .github/workflows/
+name: VX Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly Monday 6am UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: VX Security Scan
+        id: vx
+        uses: ./  # or: your-org/vx@v1
+        with:
+          url: 'https://your-app.com'
+          min-score: 70
+          fail-on-score: true
+          comment-pr: true
+          update-badge: true
+          upload-sarif: true
+
+      - name: Print Results
+        if: always()
+        run: |
+          echo "Score: ${{ steps.vx.outputs.score }}"
+          echo "Grade: ${{ steps.vx.outputs.grade }}"
+          echo "Total: ${{ steps.vx.outputs.total-findings }}"
+          echo "Critical: ${{ steps.vx.outputs.critical-findings }}"
