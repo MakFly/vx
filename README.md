@@ -1,6 +1,10 @@
+<div align="center">
+
 # VX Security Scanner
 
-Fast, multi-module security scanner for web applications. Written in Go. Single binary. Zero dependencies.
+**Fast, open-source web application security scanner & vulnerability assessment tool**
+
+Detect XSS, SQL injection, CORS misconfig, TLS issues, open redirects, path traversal, exposed secrets, and more -- in seconds.
 
 ```
   ██╗   ██╗██╗  ██╗
@@ -14,17 +18,26 @@ Fast, multi-module security scanner for web applications. Written in Go. Single 
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/MakFly/vx/actions/workflows/ci.yml/badge.svg)](https://github.com/MakFly/vx/actions)
+[![GitHub release](https://img.shields.io/github/v/release/MakFly/vx?include_prereleases&label=release)](https://github.com/MakFly/vx/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/MakFly/vx)](https://goreportcard.com/report/github.com/MakFly/vx)
+
+[Quick Start](#quick-start) | [Modules](#remote-scan----16-modules) | [CI/CD](#cicd-integration) | [Install](#quick-start)
+
+</div>
+
+---
 
 ## Why VX?
 
-Most security scanners are slow, bloated, or limited to a single language. VX is different:
+Most web security scanners are slow (Puppeteer-based), bloated (heavy runtimes), or limited to a single language. **VX** is a modern alternative:
 
-- **Fast** -- full scan in ~7 seconds (16 modules in parallel)
-- **Single binary** -- `go build` and deploy anywhere, no runtime needed
-- **Dual mode** -- black-box (remote scan) + white-box (local audit)
-- **Multi-language** -- audits PHP, TypeScript, JavaScript, Go, Python, Java, Rust
-- **CI/CD native** -- GitHub Action, SARIF, PR comments, score badges
-- **Low false positives** -- SPA catch-all detection for Next.js, React, Vue, Angular, Nuxt
+- **Blazing fast** -- full 16-module scan in **~7 seconds** (parallel goroutines)
+- **Single binary** -- one `go build`, deploy anywhere, zero runtime dependencies
+- **Dual mode** -- black-box penetration testing (remote) + white-box code audit (local)
+- **Multi-language SAST** -- audits PHP, TypeScript, JavaScript, Go, Python, Java, Rust
+- **CI/CD native** -- GitHub Action, SARIF for Code Scanning, PR comments, score badges
+- **Low false positives** -- smart SPA catch-all detection for Next.js, React, Vue, Angular, Nuxt
+- **OWASP coverage** -- tests for Top 10 vulnerabilities: injection, XSS, broken auth, misconfig, and more
 
 ## Quick Start
 
@@ -250,10 +263,55 @@ vx/
 └── .github/workflows/      # CI + security scan + release
 ```
 
+## How VX Compares
+
+| Feature | VX | Nuclei | ZAP | Nikto | VICE |
+|---------|:--:|:------:|:---:|:-----:|:----:|
+| Single binary | Yes | Yes | No (Java) | No (Perl) | No (Node) |
+| Scan speed | ~7s | Varies | Minutes | Minutes | ~2min |
+| Local code audit (SAST) | Yes | No | No | No | JS only |
+| Multi-language SAST | 7 langs | No | No | No | No |
+| SPA false-positive filter | Yes | No | No | No | No |
+| GitHub Action | Yes | Yes | Yes | No | Yes |
+| SARIF output | Yes | Yes | No | No | Yes |
+| Dependency CVE check | Yes (OSV.dev) | No | No | No | npm only |
+| SQLi + XSS testing | Yes | Yes | Yes | Limited | Yes |
+| Score & grading | Yes (0-100, A-F) | No | Risk levels | No | Yes |
+| TLS audit | Yes | No | Yes | Yes | No |
+| Subdomain enum | Yes | No | No | No | Yes |
+| Port scanning | Yes | No | No | No | Yes |
+
+## Use Cases
+
+- **Penetration testing** -- run `vx scan` against staging/production targets
+- **CI/CD security gate** -- block merges if security score drops below threshold
+- **Code review** -- run `vx audit` to catch hardcoded secrets, SQLi patterns, XSS sinks
+- **Compliance** -- generate SARIF reports for security audits and compliance documentation
+- **Bug bounty** -- quickly enumerate attack surface (subdomains, ports, JS endpoints, APIs)
+- **DevSecOps** -- integrate into your pipeline with the GitHub Action
+
 ## Legal
 
 VX displays a legal disclaimer on first run. Only scan systems you own or have explicit written permission to test. Unauthorized access to computer systems is illegal.
 
+## Contributing
+
+Contributions are welcome. Please open an issue first to discuss what you would like to change.
+
+```bash
+git clone https://github.com/MakFly/vx.git
+cd vx
+make all  # build + test + lint
+```
+
 ## License
 
 [MIT](LICENSE)
+
+---
+
+<div align="center">
+
+**If VX helped you, consider giving it a star** -- it helps others discover the project.
+
+</div>
