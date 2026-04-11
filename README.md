@@ -29,7 +29,10 @@ Most security scanners are slow, bloated, or limited to a single language. VX is
 ## Quick Start
 
 ```bash
-# Install
+# One-liner install (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash
+
+# Or via Go
 go install github.com/MakFly/vx@latest
 
 # Or build from source

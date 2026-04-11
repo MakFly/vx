@@ -14,8 +14,6 @@ type HTTPMethods struct{}
 func (h *HTTPMethods) Name() string        { return "httpmethods" }
 func (h *HTTPMethods) Description() string { return "HTTP methods testing (OPTIONS, TRACE, PUT, DELETE)" }
 
-var methodsToTest = []string{"OPTIONS", "PUT", "DELETE", "PATCH", "TRACE", "CONNECT"}
-
 func (h *HTTPMethods) Run(cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	var findings []engine.Finding
@@ -43,7 +41,7 @@ func (h *HTTPMethods) testOptions(client *http.Client, cfg *engine.Config) []eng
 	if err != nil {
 		return findings
 	}
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 
 	allow := resp.Header.Get("Allow")

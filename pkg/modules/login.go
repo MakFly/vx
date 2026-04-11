@@ -83,7 +83,6 @@ func (l *Login) findLoginForm(client *http.Client, cfg *engine.Config) (string, 
 }
 
 var passwordFieldRe = regexp.MustCompile(`(?i)<input[^>]*type\s*=\s*["']password["'][^>]*>`)
-var formActionRe = regexp.MustCompile(`(?i)<form[^>]*action\s*=\s*["']([^"']*)["'][^>]*>`)
 var formMethodRe = regexp.MustCompile(`(?i)<form[^>]*method\s*=\s*["']([^"']*)["'][^>]*>`)
 var csrfTokenRe = regexp.MustCompile(`(?i)<input[^>]*name\s*=\s*["'](_?csrf[_-]?token|_token|authenticity_token|__RequestVerificationToken|csrfmiddlewaretoken|_csrf)["'][^>]*>`)
 var autocompleteOffRe = regexp.MustCompile(`(?i)autocomplete\s*=\s*["'](off|new-password|current-password)["']`)
@@ -175,7 +174,7 @@ func (l *Login) testRateLimiting(client *http.Client, cfg *engine.Config, formUR
 		if err != nil {
 			break
 		}
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 
 		if resp.StatusCode == 429 {

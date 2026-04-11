@@ -151,7 +151,7 @@ func (j *JSDiscovery) Run(cfg *engine.Config) ([]engine.Finding, error) {
 		findings = append(findings, engine.Finding{
 			Module:      j.Name(),
 			Severity:    engine.SevLow,
-			Title:       fmt.Sprintf("Hardcoded API URL to external service"),
+			Title:       "Hardcoded API URL to external service",
 			Description: "JavaScript bundle contains a hardcoded URL to an external API",
 			Evidence:    truncate(ep.Path, 200),
 		})

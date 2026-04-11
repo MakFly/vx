@@ -35,7 +35,7 @@ func runInteractive() {
 			exitError("URL is required")
 		}
 		scanCmd.SetArgs([]string{url})
-		scanCmd.Execute()
+		_ = scanCmd.Execute()
 
 	case "2":
 		fmt.Print("\n  Local path: ")
@@ -64,10 +64,10 @@ func runInteractive() {
 		}
 		fmt.Printf("  Full scan (remote: %s, local: %s) — local audit not yet implemented.\n", url, path)
 		scanCmd.SetArgs([]string{url})
-		scanCmd.Execute()
+		_ = scanCmd.Execute()
 
 	case "4":
-		historyListCmd.Execute()
+		_ = historyListCmd.Execute()
 
 	case "5":
 		fmt.Println("  Goodbye.")

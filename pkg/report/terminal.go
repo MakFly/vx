@@ -119,5 +119,5 @@ func PrintReport(result engine.ScoreResult) {
 func PrintJSON(result engine.ScoreResult) {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	enc.Encode(result)
+	_ = enc.Encode(result)
 }

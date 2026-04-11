@@ -226,10 +226,6 @@ func (w *Webservice) testModuleEndpoints(client *http.Client, base string, cfg *
 	return findings
 }
 
-func (w *Webservice) probe(client *http.Client, url string, ua string) (int, string) {
-	r := DoRequest(client, "GET", url, ua)
-	return r.Code, r.Body
-}
 
 func (w *Webservice) probeDetailed(client *http.Client, url string, ua string) ProbeResult {
 	return DoRequest(client, "GET", url, ua)

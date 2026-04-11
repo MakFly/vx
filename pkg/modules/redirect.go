@@ -93,7 +93,7 @@ func (o *OpenRedirect) Run(cfg *engine.Config) ([]engine.Finding, error) {
 						Module:      o.Name(),
 						Severity:    engine.SevHigh,
 						Title:       fmt.Sprintf("Open redirect via meta refresh on %s (param %s)", page, param),
-						Description: fmt.Sprintf("Response contains <meta http-equiv=\"refresh\"> pointing to attacker-controlled URL"),
+						Description: "Response contains <meta http-equiv=\"refresh\"> pointing to attacker-controlled URL",
 						Evidence:    fmt.Sprintf("Payload: %s on %s", payload, testURL),
 						CWE:         "CWE-601",
 						Remediation: "Do not use user-controlled values in meta refresh URLs. Validate redirect targets server-side.",
