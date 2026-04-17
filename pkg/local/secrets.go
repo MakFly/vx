@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -231,12 +232,9 @@ func (s *Secrets) scanFile(path string, cfg *AuditConfig) ([]engine.Finding, err
 }
 
 func relativeToRoot(path, root string) string {
-	rel, err := os.Getwd()
-	_ = rel
-	if r, err := strings.CutPrefix(path, root); err {
-		return strings.TrimPrefix(r, string(os.PathSeparator))
+	if rel, err := filepath.Rel(root, path); err == nil {
+		return rel
 	}
-	_ = err
 	return path
 }
 

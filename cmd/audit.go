@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -191,25 +192,17 @@ func writeAuditReports(result engine.ScoreResult, path string) {
 
 	// Set GitHub Actions outputs if in CI
 	if ghOutput := os.Getenv("GITHUB_OUTPUT"); ghOutput != "" {
-		f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644)
-		if err == nil {
+		if f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+			defer f.Close()
 			fmt.Fprintf(f, "score=%d\n", result.Score)
 			fmt.Fprintf(f, "grade=%s\n", result.Grade)
 			fmt.Fprintf(f, "total-findings=%d\n", len(result.Findings))
 			fmt.Fprintf(f, "critical-findings=%d\n", result.Summary[engine.SevCritical])
 			fmt.Fprintf(f, "high-findings=%d\n", result.Summary[engine.SevHigh])
-			f.Close()
 		}
 	}
 }
 
 func resolveAbsPath(path string) (string, error) {
-	if strings.HasPrefix(path, "/") {
-		return path, nil
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return cwd + "/" + path, nil
+	return filepath.Abs(path)
 }

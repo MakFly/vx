@@ -1,6 +1,8 @@
 package report
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -73,8 +75,8 @@ func WriteSARIF(result engine.ScoreResult, path string) error {
 	rules := make(map[string]sarifRule)
 	var results []sarifResult
 
-	for i, f := range result.Findings {
-		ruleID := fmt.Sprintf("VX-%s-%03d", f.Module, i)
+	for _, f := range result.Findings {
+		ruleID := sarifRuleID(f)
 
 		if _, exists := rules[ruleID]; !exists {
 			rules[ruleID] = sarifRule{
@@ -138,6 +140,16 @@ func WriteSARIF(result engine.ScoreResult, path string) error {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	return enc.Encode(log)
+}
+
+// sarifRuleID returns a stable rule identifier derived from the finding's module,
+// CWE, and title. Two scans of the same finding always produce the same ID.
+func sarifRuleID(f engine.Finding) string {
+	if f.CWE != "" {
+		return fmt.Sprintf("VX-%s-%s", f.Module, f.CWE)
+	}
+	sum := sha256.Sum256([]byte(f.Module + ":" + f.Title))
+	return fmt.Sprintf("VX-%s-%s", f.Module, hex.EncodeToString(sum[:4]))
 }
 
 func sarifLevel(s engine.Severity) string {
