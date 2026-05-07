@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,7 +14,7 @@ type CORS struct{}
 func (c *CORS) Name() string        { return "cors" }
 func (c *CORS) Description() string { return "CORS misconfiguration testing" }
 
-func (c *CORS) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (c *CORS) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	var findings []engine.Finding
 

@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -50,7 +51,7 @@ var (
 	windowsIniRe  = regexp.MustCompile(`(?i)\[(extensions|fonts)\]`)
 )
 
-func (p *PathTraversal) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (p *PathTraversal) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	base := strings.TrimRight(cfg.TargetURL, "/")
 

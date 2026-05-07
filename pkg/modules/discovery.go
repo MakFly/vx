@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,7 +16,7 @@ type Discovery struct{}
 func (d *Discovery) Name() string        { return "discovery" }
 func (d *Discovery) Description() string { return "Technology fingerprinting, sensitive paths, DNS recon" }
 
-func (d *Discovery) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (d *Discovery) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	resp, body, err := doGet(client, cfg.TargetURL, cfg.UserAgent)
 	if err != nil {

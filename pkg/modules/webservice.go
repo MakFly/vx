@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ type Webservice struct{}
 func (w *Webservice) Name() string        { return "webservice" }
 func (w *Webservice) Description() string { return "API/webservice discovery and security testing" }
 
-func (w *Webservice) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (w *Webservice) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	base := strings.TrimRight(cfg.TargetURL, "/")
 

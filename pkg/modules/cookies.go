@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,7 +13,7 @@ type Cookies struct{}
 func (c *Cookies) Name() string        { return "cookies" }
 func (c *Cookies) Description() string { return "Cookie security flags analysis" }
 
-func (c *Cookies) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (c *Cookies) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	resp, _, err := doGet(client, cfg.TargetURL, cfg.UserAgent)
 	if err != nil {

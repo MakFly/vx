@@ -106,7 +106,13 @@ func runFull(cmd *cobra.Command, args []string) {
 	eng.Register(&modules.XSS{})
 	eng.Register(&modules.InfoDisclosure{})
 
-	remoteResult := eng.Run()
+	remoteResult, runErr := eng.Run()
+	if runErr != nil {
+		exitError(fmt.Sprintf("scan engine error: %v", runErr))
+	}
+	if len(remoteResult.Errors) > 0 && fullVerbose {
+		fmt.Fprintf(os.Stderr, "  [!] %d module(s) failed — remote scan may be incomplete\n", len(remoteResult.Errors))
+	}
 
 	// --- Phase 2: Local audit ---
 	if !fullJSON {

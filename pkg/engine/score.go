@@ -11,10 +11,13 @@ const (
 )
 
 type ScoreResult struct {
-	Score    int      `json:"score"`
-	Grade    Grade    `json:"grade"`
-	Findings []Finding `json:"findings"`
+	Score    int              `json:"score"`
+	Grade    Grade            `json:"grade"`
+	Findings []Finding        `json:"findings"`
 	Summary  map[Severity]int `json:"summary"`
+	// Errors holds per-module errors encountered during the scan.
+	// A non-empty Errors slice means the scan is partial.
+	Errors []ModuleError `json:"errors,omitempty"`
 }
 
 func ComputeScore(findings []Finding) ScoreResult {

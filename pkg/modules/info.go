@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,7 +14,7 @@ type InfoDisclosure struct{}
 func (i *InfoDisclosure) Name() string        { return "info" }
 func (i *InfoDisclosure) Description() string { return "Information disclosure in HTML, JS, and comments" }
 
-func (i *InfoDisclosure) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (i *InfoDisclosure) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	_, body, err := doGet(client, cfg.TargetURL, cfg.UserAgent)
 	if err != nil {

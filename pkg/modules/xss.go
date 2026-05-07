@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,7 +16,7 @@ type XSS struct{}
 func (x *XSS) Name() string        { return "xss" }
 func (x *XSS) Description() string { return "Reflected XSS detection via form inputs and URL parameters" }
 
-func (x *XSS) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (x *XSS) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	base := strings.TrimRight(cfg.TargetURL, "/")
 

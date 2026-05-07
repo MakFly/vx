@@ -107,7 +107,14 @@ func runScan(cmd *cobra.Command, args []string) {
 
 	// Run
 	scanStart := time.Now()
-	result := eng.Run()
+	result, runErr := eng.Run()
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", runErr)
+		os.Exit(1)
+	}
+	if len(result.Errors) > 0 && scanVerbose {
+		fmt.Fprintf(os.Stderr, "  [!] %d module(s) failed — scan may be incomplete\n", len(result.Errors))
+	}
 	scanDuration := time.Since(scanStart)
 
 	// Output

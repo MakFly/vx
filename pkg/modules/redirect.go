@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -34,7 +35,7 @@ var redirectPayloads = []string{
 	"javascript:alert(1)",
 }
 
-func (o *OpenRedirect) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (o *OpenRedirect) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newNoRedirectClient(cfg)
 	base := strings.TrimRight(cfg.TargetURL, "/")
 

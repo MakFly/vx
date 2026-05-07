@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,7 +15,7 @@ type HTTPMethods struct{}
 func (h *HTTPMethods) Name() string        { return "httpmethods" }
 func (h *HTTPMethods) Description() string { return "HTTP methods testing (OPTIONS, TRACE, PUT, DELETE)" }
 
-func (h *HTTPMethods) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (h *HTTPMethods) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	var findings []engine.Finding
 

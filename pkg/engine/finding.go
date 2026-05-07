@@ -2,6 +2,12 @@ package engine
 
 import "fmt"
 
+// ModuleError records a module name and its execution error.
+type ModuleError struct {
+	Module string
+	Err    error
+}
+
 type Severity int
 
 const (
