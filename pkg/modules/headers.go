@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,7 +13,7 @@ type Headers struct{}
 func (h *Headers) Name() string        { return "headers" }
 func (h *Headers) Description() string { return "Security headers analysis" }
 
-func (h *Headers) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (h *Headers) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	resp, _, err := doGet(client, cfg.TargetURL, cfg.UserAgent)
 	if err != nil {

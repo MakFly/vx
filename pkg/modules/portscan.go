@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -44,7 +45,7 @@ var commonPorts = []portInfo{
 	{27017, "MongoDB", true},
 }
 
-func (p *PortScan) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (p *PortScan) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	host := extractHost(cfg.TargetURL)
 	if host == "" {
 		return nil, fmt.Errorf("could not extract host from %s", cfg.TargetURL)

@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,7 +24,7 @@ var loginPaths = []string{
 	"/wp-login.php", "/wp-admin",
 }
 
-func (l *Login) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (l *Login) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	var findings []engine.Finding
 

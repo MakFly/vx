@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -89,7 +90,7 @@ type sqliEndpoint struct {
 	name  string
 }
 
-func (s *SQLi) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (s *SQLi) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	base := strings.TrimRight(cfg.TargetURL, "/")
 

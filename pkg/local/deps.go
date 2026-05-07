@@ -1,7 +1,9 @@
 package local
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,11 +23,22 @@ type Deps struct{}
 func (d *Deps) Name() string        { return "dependencies" }
 func (d *Deps) Description() string { return "Check dependencies for known vulnerabilities (OSV.dev)" }
 
-const osvAPIURL = "https://api.osv.dev/v1/query"
+const (
+	osvBatchAPIURL = "https://api.osv.dev/v1/querybatch"
+	// maxResponseBytes caps the OSV response body to prevent memory exhaustion.
+	maxResponseBytes = 1 << 20 // 1 MiB
+	// osvRetryMax is the maximum number of attempts for a single OSV request.
+	osvRetryMax = 3
+)
 
-var httpClient = &http.Client{Timeout: 10 * time.Second}
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-// osvQuery is the request body for the OSV.dev API.
+// osvBatchQuery is the request body for the OSV.dev /v1/querybatch endpoint.
+type osvBatchQuery struct {
+	Queries []osvQuery `json:"queries"`
+}
+
+// osvQuery is a single query within a batch.
 type osvQuery struct {
 	Package osvPackage `json:"package"`
 	Version string     `json:"version,omitempty"`
@@ -36,16 +49,21 @@ type osvPackage struct {
 	Ecosystem string `json:"ecosystem"`
 }
 
-// osvResponse is the response from the OSV.dev API.
+// osvBatchResponse is the response from /v1/querybatch.
+type osvBatchResponse struct {
+	Results []osvResponse `json:"results"`
+}
+
+// osvResponse is the per-query result.
 type osvResponse struct {
 	Vulns []osvVuln `json:"vulns"`
 }
 
 type osvVuln struct {
-	ID       string     `json:"id"`
-	Summary  string     `json:"summary"`
+	ID       string        `json:"id"`
+	Summary  string        `json:"summary"`
 	Severity []osvSeverity `json:"severity"`
-	Aliases  []string   `json:"aliases"`
+	Aliases  []string      `json:"aliases"`
 }
 
 type osvSeverity struct {
@@ -53,50 +71,74 @@ type osvSeverity struct {
 	Score string `json:"score"`
 }
 
+// depEntry holds a (name, version, ecosystem) triple for batch queries.
+type depEntry struct {
+	name      string
+	version   string
+	ecosystem string
+}
+
 func (d *Deps) Run(cfg *AuditConfig) ([]engine.Finding, error) {
+	ctx := context.Background()
 	var findings []engine.Finding
+	var scanErrors []string
 
 	// JavaScript / TypeScript
 	if HasLanguage(cfg, "javascript") || HasLanguage(cfg, "typescript") {
-		f, err := d.checkNPM(cfg)
-		if err != nil && cfg.Verbose {
-			fmt.Fprintf(os.Stderr, "  [!] deps: npm check error: %v\n", err)
+		f, err := d.checkNPM(ctx, cfg)
+		if err != nil {
+			scanErrors = append(scanErrors, fmt.Sprintf("npm: %v", err))
+			if cfg.Verbose {
+				fmt.Fprintf(os.Stderr, "  [!] deps: npm check error: %v\n", err)
+			}
 		}
 		findings = append(findings, f...)
 	}
 
 	// PHP
 	if HasLanguage(cfg, "php") {
-		f, err := d.checkComposer(cfg)
-		if err != nil && cfg.Verbose {
-			fmt.Fprintf(os.Stderr, "  [!] deps: composer check error: %v\n", err)
+		f, err := d.checkComposer(ctx, cfg)
+		if err != nil {
+			scanErrors = append(scanErrors, fmt.Sprintf("composer: %v", err))
+			if cfg.Verbose {
+				fmt.Fprintf(os.Stderr, "  [!] deps: composer check error: %v\n", err)
+			}
 		}
 		findings = append(findings, f...)
 	}
 
 	// Go
 	if HasLanguage(cfg, "go") {
-		f, err := d.checkGo(cfg)
-		if err != nil && cfg.Verbose {
-			fmt.Fprintf(os.Stderr, "  [!] deps: go check error: %v\n", err)
+		f, err := d.checkGo(ctx, cfg)
+		if err != nil {
+			scanErrors = append(scanErrors, fmt.Sprintf("go: %v", err))
+			if cfg.Verbose {
+				fmt.Fprintf(os.Stderr, "  [!] deps: go check error: %v\n", err)
+			}
 		}
 		findings = append(findings, f...)
 	}
 
 	// Python
 	if HasLanguage(cfg, "python") {
-		f, err := d.checkPython(cfg)
-		if err != nil && cfg.Verbose {
-			fmt.Fprintf(os.Stderr, "  [!] deps: python check error: %v\n", err)
+		f, err := d.checkPython(ctx, cfg)
+		if err != nil {
+			scanErrors = append(scanErrors, fmt.Sprintf("python: %v", err))
+			if cfg.Verbose {
+				fmt.Fprintf(os.Stderr, "  [!] deps: python check error: %v\n", err)
+			}
 		}
 		findings = append(findings, f...)
 	}
 
 	// Rust
 	if HasLanguage(cfg, "rust") {
-		f, err := d.checkRust(cfg)
-		if err != nil && cfg.Verbose {
-			fmt.Fprintf(os.Stderr, "  [!] deps: rust check error: %v\n", err)
+		f, err := d.checkRust(ctx, cfg)
+		if err != nil {
+			scanErrors = append(scanErrors, fmt.Sprintf("rust: %v", err))
+			if cfg.Verbose {
+				fmt.Fprintf(os.Stderr, "  [!] deps: rust check error: %v\n", err)
+			}
 		}
 		findings = append(findings, f...)
 	}
@@ -116,11 +158,14 @@ func (d *Deps) Run(cfg *AuditConfig) ([]engine.Finding, error) {
 		}
 	}
 
+	if len(scanErrors) > 0 {
+		return findings, fmt.Errorf("dependency scan incomplete: %s", strings.Join(scanErrors, "; "))
+	}
 	return findings, nil
 }
 
 // checkNPM reads package.json and queries OSV.dev for each dependency.
-func (d *Deps) checkNPM(cfg *AuditConfig) ([]engine.Finding, error) {
+func (d *Deps) checkNPM(ctx context.Context, cfg *AuditConfig) ([]engine.Finding, error) {
 	pkgPath := filepath.Join(cfg.Path, "package.json")
 	data, err := os.ReadFile(pkgPath)
 	if err != nil {
@@ -135,28 +180,21 @@ func (d *Deps) checkNPM(cfg *AuditConfig) ([]engine.Finding, error) {
 		return nil, fmt.Errorf("parse package.json: %w", err)
 	}
 
-	var findings []engine.Finding
 	allDeps := mergeMaps(pkg.Dependencies, pkg.DevDependencies)
-
+	entries := make([]depEntry, 0, len(allDeps))
 	for name, version := range allDeps {
-		version = cleanVersion(version)
-		vulns, err := queryOSV(name, version, "npm")
-		if err != nil {
-			if cfg.Verbose {
-				fmt.Fprintf(os.Stderr, "  [!] deps: OSV query failed for %s: %v\n", name, err)
-			}
-			continue
-		}
-		for _, v := range vulns {
-			findings = append(findings, vulnToFinding(name, version, v))
-		}
+		entries = append(entries, depEntry{
+			name:      name,
+			version:   cleanVersion(version),
+			ecosystem: "npm",
+		})
 	}
 
-	return findings, nil
+	return queryOSVBatch(ctx, entries)
 }
 
 // checkComposer reads composer.lock and queries OSV.dev.
-func (d *Deps) checkComposer(cfg *AuditConfig) ([]engine.Finding, error) {
+func (d *Deps) checkComposer(ctx context.Context, cfg *AuditConfig) ([]engine.Finding, error) {
 	lockPath := filepath.Join(cfg.Path, "composer.lock")
 	data, err := os.ReadFile(lockPath)
 	if err != nil {
@@ -173,33 +211,33 @@ func (d *Deps) checkComposer(cfg *AuditConfig) ([]engine.Finding, error) {
 		return nil, fmt.Errorf("parse composer.lock: %w", err)
 	}
 
-	var findings []engine.Finding
+	entries := make([]depEntry, 0, len(lock.Packages))
 	for _, pkg := range lock.Packages {
-		version := cleanVersion(pkg.Version)
-		vulns, err := queryOSV(pkg.Name, version, "Packagist")
-		if err != nil {
-			continue
-		}
-		for _, v := range vulns {
-			findings = append(findings, vulnToFinding(pkg.Name, version, v))
-		}
+		entries = append(entries, depEntry{
+			name:      pkg.Name,
+			version:   cleanVersion(pkg.Version),
+			ecosystem: "Packagist",
+		})
 	}
 
-	return findings, nil
+	return queryOSVBatch(ctx, entries)
 }
 
-// checkGo reads go.sum and queries OSV.dev.
-func (d *Deps) checkGo(cfg *AuditConfig) ([]engine.Finding, error) {
+// checkGo reads go.sum line by line and queries OSV.dev.
+func (d *Deps) checkGo(ctx context.Context, cfg *AuditConfig) ([]engine.Finding, error) {
 	sumPath := filepath.Join(cfg.Path, "go.sum")
-	data, err := os.ReadFile(sumPath)
+	f, err := os.Open(sumPath)
 	if err != nil {
 		return nil, nil
 	}
+	defer f.Close()
 
 	seen := make(map[string]bool)
-	var findings []engine.Finding
+	var entries []depEntry
 
-	for _, line := range strings.Split(string(data), "\n") {
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
 		parts := strings.Fields(line)
 		if len(parts) < 2 {
 			continue
@@ -214,71 +252,74 @@ func (d *Deps) checkGo(cfg *AuditConfig) ([]engine.Finding, error) {
 		}
 		seen[key] = true
 
-		vulns, err := queryOSV(name, version, "Go")
-		if err != nil {
-			continue
-		}
-		for _, v := range vulns {
-			findings = append(findings, vulnToFinding(name, version, v))
-		}
+		entries = append(entries, depEntry{
+			name:      name,
+			version:   version,
+			ecosystem: "Go",
+		})
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read go.sum: %w", err)
 	}
 
-	return findings, nil
+	return queryOSVBatch(ctx, entries)
 }
 
-// checkPython reads requirements.txt and queries OSV.dev.
-func (d *Deps) checkPython(cfg *AuditConfig) ([]engine.Finding, error) {
+// checkPython reads requirements.txt line by line and queries OSV.dev.
+func (d *Deps) checkPython(ctx context.Context, cfg *AuditConfig) ([]engine.Finding, error) {
 	reqPath := filepath.Join(cfg.Path, "requirements.txt")
-	data, err := os.ReadFile(reqPath)
+	f, err := os.Open(reqPath)
 	if err != nil {
 		return nil, nil
 	}
+	defer f.Close()
 
-	var findings []engine.Finding
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
+	var entries []depEntry
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "-") {
 			continue
 		}
-
 		name, version := parsePythonDep(line)
 		if name == "" || version == "" {
 			continue
 		}
-
-		vulns, err := queryOSV(name, version, "PyPI")
-		if err != nil {
-			continue
-		}
-		for _, v := range vulns {
-			findings = append(findings, vulnToFinding(name, version, v))
-		}
+		entries = append(entries, depEntry{
+			name:      name,
+			version:   version,
+			ecosystem: "PyPI",
+		})
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read requirements.txt: %w", err)
 	}
 
-	return findings, nil
+	return queryOSVBatch(ctx, entries)
 }
 
-// checkRust reads Cargo.lock and queries OSV.dev.
-func (d *Deps) checkRust(cfg *AuditConfig) ([]engine.Finding, error) {
+// checkRust reads Cargo.lock line by line and queries OSV.dev.
+func (d *Deps) checkRust(ctx context.Context, cfg *AuditConfig) ([]engine.Finding, error) {
 	lockPath := filepath.Join(cfg.Path, "Cargo.lock")
-	data, err := os.ReadFile(lockPath)
+	f, err := os.Open(lockPath)
 	if err != nil {
 		return nil, nil
 	}
+	defer f.Close()
 
-	var findings []engine.Finding
-	// Simple TOML parsing for Cargo.lock [[package]] entries
+	var entries []depEntry
 	var currentName, currentVersion string
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
 		if line == "[[package]]" {
 			if currentName != "" && currentVersion != "" {
-				vulns, err := queryOSV(currentName, currentVersion, "crates.io")
-				if err == nil {
-					for _, v := range vulns {
-						findings = append(findings, vulnToFinding(currentName, currentVersion, v))
-					}
-				}
+				entries = append(entries, depEntry{
+					name:      currentName,
+					version:   currentVersion,
+					ecosystem: "crates.io",
+				})
 			}
 			currentName = ""
 			currentVersion = ""
@@ -291,55 +332,112 @@ func (d *Deps) checkRust(cfg *AuditConfig) ([]engine.Finding, error) {
 			currentVersion = strings.Trim(strings.TrimPrefix(line, "version = "), `"`)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read Cargo.lock: %w", err)
+	}
 	// Process last package
 	if currentName != "" && currentVersion != "" {
-		vulns, err := queryOSV(currentName, currentVersion, "crates.io")
-		if err == nil {
-			for _, v := range vulns {
-				findings = append(findings, vulnToFinding(currentName, currentVersion, v))
-			}
+		entries = append(entries, depEntry{
+			name:      currentName,
+			version:   currentVersion,
+			ecosystem: "crates.io",
+		})
+	}
+
+	return queryOSVBatch(ctx, entries)
+}
+
+// queryOSVBatch queries the OSV.dev /v1/querybatch endpoint for a list of
+// dependencies in a single HTTP call, with retry/backoff on transient errors.
+func queryOSVBatch(ctx context.Context, entries []depEntry) ([]engine.Finding, error) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	queries := make([]osvQuery, len(entries))
+	for i, e := range entries {
+		queries[i] = osvQuery{
+			Package: osvPackage{Name: e.name, Ecosystem: e.ecosystem},
+			Version: e.version,
+		}
+	}
+
+	reqBody, err := json.Marshal(osvBatchQuery{Queries: queries})
+	if err != nil {
+		return nil, fmt.Errorf("marshal OSV batch query: %w", err)
+	}
+
+	var batchResp osvBatchResponse
+	if err := doOSVRequestWithRetry(ctx, reqBody, &batchResp); err != nil {
+		return nil, err
+	}
+
+	var findings []engine.Finding
+	for i, res := range batchResp.Results {
+		if i >= len(entries) {
+			break
+		}
+		e := entries[i]
+		for _, v := range res.Vulns {
+			findings = append(findings, vulnToFinding(e.name, e.version, v))
 		}
 	}
 
 	return findings, nil
 }
 
-// queryOSV queries the OSV.dev API for vulnerabilities.
-func queryOSV(name, version, ecosystem string) ([]osvVuln, error) {
-	query := osvQuery{
-		Package: osvPackage{
-			Name:      name,
-			Ecosystem: ecosystem,
-		},
-		Version: version,
+// doOSVRequestWithRetry performs the HTTP POST to the OSV batch endpoint with
+// exponential backoff on transient status codes (429, 500, 502, 503, 504).
+func doOSVRequestWithRetry(ctx context.Context, body []byte, dest interface{}) error {
+	var lastErr error
+	for attempt := 0; attempt < osvRetryMax; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 2s, 4s (capped)
+			wait := time.Duration(1<<uint(attempt-1)) * time.Second
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, osvBatchAPIURL, bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("create OSV request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("OSV API unreachable: %w", err)
+			continue
+		}
+
+		switch resp.StatusCode {
+		case http.StatusOK:
+			// success path
+		case http.StatusTooManyRequests,
+			http.StatusInternalServerError,
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout:
+			resp.Body.Close()
+			lastErr = fmt.Errorf("OSV API returned status %d", resp.StatusCode)
+			continue
+		default:
+			resp.Body.Close()
+			return fmt.Errorf("OSV API returned status %d", resp.StatusCode)
+		}
+
+		if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes)).Decode(dest); err != nil {
+			resp.Body.Close()
+			return fmt.Errorf("decode OSV response: %w", err)
+		}
+		resp.Body.Close()
+		return nil
 	}
 
-	body, err := json.Marshal(query)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Post(osvAPIURL, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("OSV API unreachable: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OSV API returned status %d", resp.StatusCode)
-	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var result osvResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, err
-	}
-
-	return result.Vulns, nil
+	return fmt.Errorf("OSV API failed after %d attempts: %w", osvRetryMax, lastErr)
 }
 
 // vulnToFinding converts an OSV vulnerability to an engine.Finding.
@@ -350,7 +448,6 @@ func vulnToFinding(pkgName, version string, vuln osvVuln) engine.Finding {
 	// Try to extract severity from vuln data
 	for _, s := range vuln.Severity {
 		if s.Type == "CVSS_V3" {
-			// Parse CVSS score from vector string or score
 			cvss = parseCVSSScore(s.Score)
 			sev = cvssToSeverity(cvss)
 			break
@@ -420,12 +517,10 @@ func mergeMaps(a, b map[string]string) map[string]string {
 }
 
 func parseCVSSScore(s string) float64 {
-	// If it's a raw number
 	var score float64
 	if _, err := fmt.Sscanf(s, "%f", &score); err == nil && score >= 0 && score <= 10 {
 		return score
 	}
-	// Default
 	return 5.0
 }
 

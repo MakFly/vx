@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,7 +80,7 @@ type endpoint struct {
 	External bool
 }
 
-func (j *JSDiscovery) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (j *JSDiscovery) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
 	host := extractHost(cfg.TargetURL)
 

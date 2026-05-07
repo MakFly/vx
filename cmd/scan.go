@@ -69,13 +69,10 @@ func runScan(cmd *cobra.Command, args []string) {
 	target = strings.TrimRight(target, "/")
 
 	cfg := &engine.Config{
-		TargetURL:  target,
-		Threads:    scanThreads,
-		Timeout:    time.Duration(scanTimeout) * time.Second,
-		UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-		MinScore:   scanMinScore,
-		OutputJSON: scanJSON,
-		Verbose:    scanVerbose,
+		TargetURL: target,
+		Threads:   scanThreads,
+		Timeout:   time.Duration(scanTimeout) * time.Second,
+		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
 	}
 
 	if scanModules != "" {
@@ -110,7 +107,14 @@ func runScan(cmd *cobra.Command, args []string) {
 
 	// Run
 	scanStart := time.Now()
-	result := eng.Run()
+	result, runErr := eng.Run()
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", runErr)
+		os.Exit(1)
+	}
+	if len(result.Errors) > 0 && scanVerbose {
+		fmt.Fprintf(os.Stderr, "  [!] %d module(s) failed — scan may be incomplete\n", len(result.Errors))
+	}
 	scanDuration := time.Since(scanStart)
 
 	// Output
@@ -162,14 +166,13 @@ func runScan(cmd *cobra.Command, args []string) {
 
 	// Set GitHub Actions outputs if in CI
 	if ghOutput := os.Getenv("GITHUB_OUTPUT"); ghOutput != "" {
-		f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644)
-		if err == nil {
+		if f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+			defer f.Close()
 			fmt.Fprintf(f, "score=%d\n", result.Score)
 			fmt.Fprintf(f, "grade=%s\n", result.Grade)
 			fmt.Fprintf(f, "total-findings=%d\n", len(result.Findings))
 			fmt.Fprintf(f, "critical-findings=%d\n", result.Summary[engine.SevCritical])
 			fmt.Fprintf(f, "high-findings=%d\n", result.Summary[engine.SevHigh])
-			f.Close()
 		}
 	}
 

@@ -47,10 +47,19 @@ func dir() (string, error) {
 		return "", fmt.Errorf("get home dir: %w", err)
 	}
 	d := filepath.Join(home, ".vx", "scans")
-	if err := os.MkdirAll(d, 0755); err != nil {
+	if err := os.MkdirAll(d, 0700); err != nil {
 		return "", fmt.Errorf("create history dir: %w", err)
 	}
 	return d, nil
+}
+
+// safePath joins filename to dir and rejects paths that escape dir.
+func safePath(dir, filename string) (string, error) {
+	cleaned := filepath.Clean(filename)
+	if filepath.IsAbs(cleaned) || strings.HasPrefix(cleaned, "..") || strings.ContainsRune(cleaned, filepath.Separator) {
+		return "", fmt.Errorf("invalid filename: %q", filename)
+	}
+	return filepath.Join(dir, cleaned), nil
 }
 
 // SaveScan persists a scan result to ~/.vx/scans/.
@@ -76,7 +85,7 @@ func SaveScan(result engine.ScoreResult, target string, duration time.Duration) 
 		return fmt.Errorf("marshal scan: %w", err)
 	}
 
-	return os.WriteFile(filepath.Join(d, filename), data, 0644)
+	return os.WriteFile(filepath.Join(d, filename), data, 0600)
 }
 
 // ListScans returns all saved scans sorted by date (newest first).
@@ -132,7 +141,12 @@ func LoadScan(filename string) (*StoredScan, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(filepath.Join(d, filename))
+	path, err := safePath(d, filename)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read scan file: %w", err)
 	}

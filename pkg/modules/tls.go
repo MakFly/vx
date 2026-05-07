@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -16,7 +17,7 @@ type TLS struct{}
 func (t *TLS) Name() string        { return "tls" }
 func (t *TLS) Description() string { return "TLS/SSL certificate and configuration analysis" }
 
-func (t *TLS) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (t *TLS) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	host := extractHost(cfg.TargetURL)
 	if host == "" {
 		return nil, fmt.Errorf("could not extract host from %s", cfg.TargetURL)

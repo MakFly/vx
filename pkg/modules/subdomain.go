@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -45,7 +46,7 @@ type subdomainResult struct {
 	httpsOK   bool
 }
 
-func (s *Subdomain) Run(cfg *engine.Config) ([]engine.Finding, error) {
+func (s *Subdomain) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	host := extractHost(cfg.TargetURL)
 	if host == "" {
 		return nil, fmt.Errorf("could not extract host from %s", cfg.TargetURL)

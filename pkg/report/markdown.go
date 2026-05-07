@@ -74,7 +74,7 @@ func gradeToEmoji(g engine.Grade) string {
 	case engine.GradeA:
 		return "🟢"
 	case engine.GradeB:
-		return "🟢"
+		return "🟩"
 	case engine.GradeC:
 		return "🟡"
 	case engine.GradeD:

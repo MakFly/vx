@@ -12,21 +12,20 @@ import (
 )
 
 type htmlData struct {
-	Target       string
-	Date         string
-	Score        int
-	Grade        engine.Grade
-	GradeColor   string
-	ScoreColor   string
-	Findings     []engine.Finding
-	Modules      []htmlModule
-	Summary      map[string]int
+	Target        string
+	Date          string
+	Score         int
+	Grade         engine.Grade
+	GradeColor    string
+	ScoreColor    string
+	Findings      []engine.Finding
+	Modules       []htmlModule
 	CriticalCount int
-	HighCount    int
-	MediumCount  int
-	LowCount     int
-	InfoCount    int
-	TotalCount   int
+	HighCount     int
+	MediumCount   int
+	LowCount      int
+	InfoCount     int
+	TotalCount    int
 }
 
 type htmlModule struct {
