@@ -71,7 +71,7 @@ func (p *PortScan) Run(ctx context.Context, cfg *engine.Config) ([]engine.Findin
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			addr := fmt.Sprintf("%s:%d", host, pi.port)
+			addr := net.JoinHostPort(host, fmt.Sprintf("%d", pi.port))
 			conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 			if err != nil {
 				return

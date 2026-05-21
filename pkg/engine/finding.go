@@ -4,8 +4,15 @@ import "fmt"
 
 // ModuleError records a module name and its execution error.
 type ModuleError struct {
-	Module string
-	Err    error
+	Module string `json:"module"`
+	Error  string `json:"error"`
+}
+
+func NewModuleError(module string, err error) ModuleError {
+	if err == nil {
+		return ModuleError{Module: module}
+	}
+	return ModuleError{Module: module, Error: err.Error()}
 }
 
 type Severity int

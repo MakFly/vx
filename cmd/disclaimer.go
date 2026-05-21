@@ -50,8 +50,15 @@ func checkDisclaimer() {
 	if isDisclaimerAccepted() {
 		return
 	}
+	if !disclaimerRequired() {
+		return
+	}
+	if strings.EqualFold(os.Getenv("VX_ACCEPT_DISCLAIMER"), "true") || os.Getenv("VX_ACCEPT_DISCLAIMER") == "1" {
+		writeDisclaimerAccepted()
+		return
+	}
 
-	fmt.Print(disclaimerText)
+	fmt.Fprint(os.Stderr, disclaimerText)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	if !scanner.Scan() {
@@ -60,11 +67,24 @@ func checkDisclaimer() {
 
 	answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
 	if answer != "y" && answer != "yes" {
-		fmt.Println("\n  Disclaimer not accepted. Exiting.")
+		fmt.Fprintln(os.Stderr, "\n  Disclaimer not accepted. Exiting.")
 		os.Exit(1)
 	}
 
-	// Write acceptance marker
+	writeDisclaimerAccepted()
+}
+
+func disclaimerRequired() bool {
+	for _, arg := range os.Args[1:] {
+		switch arg {
+		case "version", "help", "-h", "--help":
+			return false
+		}
+	}
+	return true
+}
+
+func writeDisclaimerAccepted() {
 	path := acceptedFilePath()
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {

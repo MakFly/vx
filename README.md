@@ -15,7 +15,7 @@ Detect XSS, SQL injection, CORS misconfig, TLS issues, open redirects, path trav
     ╚═══╝  ╚═╝  ╚═╝
 ```
 
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.26.3+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/MakFly/vx/actions/workflows/ci.yml/badge.svg)](https://github.com/MakFly/vx/actions)
 [![GitHub release](https://img.shields.io/github/v/release/MakFly/vx?include_prereleases&label=release)](https://github.com/MakFly/vx/releases)
@@ -42,11 +42,14 @@ Most web security scanners are slow (Puppeteer-based), bloated (heavy runtimes),
 ## Quick Start
 
 ```bash
-# One-liner install (Linux/macOS)
+# Install from GitHub (Linux/macOS)
 curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash
 
-# Or via Go
-go install github.com/MakFly/vx@latest
+# Optional: install without sudo
+curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | VX_INSTALL_DIR="$HOME/.local/bin" bash
+
+# Optional: pin a release
+curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | VX_VERSION=v0.1.0 bash
 
 # Or build from source
 git clone https://github.com/MakFly/vx.git
@@ -54,6 +57,9 @@ cd vx && go build -o vx ./main.go
 
 # Remote scan (black-box)
 ./vx scan https://example.com
+
+# Include intrusive modules (portscan, subdomain, login)
+./vx scan https://example.com --aggressive
 
 # Local audit (white-box)
 ./vx audit ./my-project
@@ -66,6 +72,8 @@ cd vx && go build -o vx ./main.go
 ```
 
 ## Remote Scan -- 16 Modules
+
+Default scans skip the more intrusive `portscan`, `subdomain`, and `login` modules. Pass `--aggressive` to include them, or select them explicitly with `--modules`.
 
 | Module | What it checks |
 |--------|---------------|
@@ -155,7 +163,7 @@ The action automatically:
 
 ```bash
 # Install
-go install github.com/MakFly/vx@latest
+curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash
 
 # Run with threshold
 vx scan https://your-app.com --ci --min-score 75 --sarif results.sarif
@@ -190,7 +198,7 @@ target: https://your-app.com
 threads: 10
 timeout: 15
 
-modules: []  # empty = all
+modules: []  # empty = safe default modules; use --aggressive for intrusive modules
 
 ci:
   min-score: 70

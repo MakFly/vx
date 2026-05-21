@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"strings"
 	"time"
 
@@ -137,4 +138,24 @@ func IsRealAPIResponse(r ProbeResult) bool {
 		return !IsSPACatchAll(r.Body)
 	}
 	return true
+}
+
+func extractHost(rawURL string) string {
+	s := strings.TrimSpace(rawURL)
+	if s == "" {
+		return ""
+	}
+	if !strings.Contains(s, "://") {
+		s = "https://" + s
+	}
+
+	u, err := url.Parse(s)
+	if err != nil {
+		return ""
+	}
+	host := u.Hostname()
+	if host == "" {
+		return ""
+	}
+	return strings.Trim(host, "[]")
 }

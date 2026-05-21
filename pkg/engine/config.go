@@ -7,5 +7,6 @@ type Config struct {
 	Threads   int
 	Timeout   time.Duration
 	UserAgent string
-	Modules   []string // empty = all
+	Modules   []string // empty = all registered modules
+	Silent    bool
 }

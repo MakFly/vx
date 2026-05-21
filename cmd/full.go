@@ -3,28 +3,27 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/MakFly/vx/pkg/engine"
 	"github.com/MakFly/vx/pkg/local"
-	"github.com/MakFly/vx/pkg/modules"
 	"github.com/MakFly/vx/pkg/report"
 	"github.com/spf13/cobra"
 )
 
 var (
-	fullURL      string
-	fullMinScore int
-	fullJSON     bool
-	fullVerbose  bool
-	fullCI       bool
-	fullSARIF    string
-	fullBadge    string
-	fullMarkdown string
-	fullLang     string
-	fullThreads  int
-	fullTimeout  int
+	fullURL        string
+	fullMinScore   int
+	fullJSON       bool
+	fullVerbose    bool
+	fullCI         bool
+	fullSARIF      string
+	fullBadge      string
+	fullMarkdown   string
+	fullLang       string
+	fullThreads    int
+	fullTimeout    int
+	fullAggressive bool
 )
 
 var fullCmd = &cobra.Command{
@@ -47,6 +46,7 @@ func init() {
 	fullCmd.Flags().StringVar(&fullLang, "lang", "", "Override language detection (comma-separated)")
 	fullCmd.Flags().IntVarP(&fullThreads, "threads", "t", 10, "Number of concurrent scan threads")
 	fullCmd.Flags().IntVar(&fullTimeout, "timeout", 15, "HTTP request timeout in seconds")
+	fullCmd.Flags().BoolVar(&fullAggressive, "aggressive", false, "Include intrusive remote modules: portscan, subdomain, login")
 
 	_ = fullCmd.MarkFlagRequired("url")
 
@@ -71,11 +71,7 @@ func runFull(cmd *cobra.Command, args []string) {
 		exitError(fmt.Sprintf("cannot resolve path: %v", err))
 	}
 
-	// Normalize URL
-	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		target = "https://" + target
-	}
-	target = strings.TrimRight(target, "/")
+	target = normalizeTarget(target)
 
 	if !fullJSON {
 		fmt.Print(banner)
@@ -95,16 +91,12 @@ func runFull(cmd *cobra.Command, args []string) {
 		TargetURL: target,
 		Threads:   fullThreads,
 		Timeout:   time.Duration(fullTimeout) * time.Second,
-		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+		UserAgent: defaultUserAgent,
+		Silent:    fullJSON,
 	}
 
 	eng := engine.New(scanCfg)
-	eng.Register(&modules.Headers{})
-	eng.Register(&modules.Cookies{})
-	eng.Register(&modules.Discovery{})
-	eng.Register(&modules.Webservice{})
-	eng.Register(&modules.XSS{})
-	eng.Register(&modules.InfoDisclosure{})
+	registerRemoteModules(eng, fullAggressive)
 
 	remoteResult, runErr := eng.Run()
 	if runErr != nil {
@@ -125,10 +117,7 @@ func runFull(cmd *cobra.Command, args []string) {
 	}
 
 	if fullLang != "" {
-		auditCfg.Languages = strings.Split(fullLang, ",")
-		for i, l := range auditCfg.Languages {
-			auditCfg.Languages[i] = strings.TrimSpace(l)
-		}
+		auditCfg.Languages = splitList(fullLang)
 	} else {
 		auditCfg.Languages = local.DetectLanguages(absPath)
 	}
@@ -141,7 +130,8 @@ func runFull(cmd *cobra.Command, args []string) {
 
 	// --- Combine results ---
 	allFindings := append(remoteResult.Findings, localResult.Findings...)
-	combined := engine.ComputeScore(allFindings)
+	allErrors := append(remoteResult.Errors, localResult.Errors...)
+	combined := engine.ComputePartialScore(allFindings, allErrors)
 
 	elapsed := time.Since(start)
 
@@ -183,21 +173,8 @@ func runFull(cmd *cobra.Command, args []string) {
 	}
 
 	// GitHub Actions outputs
-	if ghOutput := os.Getenv("GITHUB_OUTPUT"); ghOutput != "" {
-		f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644)
-		if err == nil {
-			fmt.Fprintf(f, "score=%d\n", combined.Score)
-			fmt.Fprintf(f, "grade=%s\n", combined.Grade)
-			fmt.Fprintf(f, "total-findings=%d\n", len(combined.Findings))
-			fmt.Fprintf(f, "critical-findings=%d\n", combined.Summary[engine.SevCritical])
-			fmt.Fprintf(f, "high-findings=%d\n", combined.Summary[engine.SevHigh])
-			f.Close()
-		}
-	}
+	writeGithubOutputs(combined)
 
 	// CI mode exit code
-	if fullCI && fullMinScore > 0 && combined.Score < fullMinScore {
-		fmt.Fprintf(os.Stderr, "FAIL: Score %d < minimum %d\n", combined.Score, fullMinScore)
-		os.Exit(1)
-	}
+	failCIIfNeeded(fullCI, fullMinScore, combined)
 }

@@ -2,7 +2,10 @@
 set -euo pipefail
 
 # VX Security Scanner — Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | VX_VERSION=v0.1.0 bash
+#   curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | VX_INSTALL_DIR="$HOME/.local/bin" bash
 
 VERSION="${VX_VERSION:-latest}"
 REPO="MakFly/vx"
@@ -51,9 +54,9 @@ get_latest_version() {
     echo "$latest"
 }
 
-# Check for required tools
+# Check for required tools needed for all install paths.
 check_deps() {
-    for cmd in curl tar; do
+    for cmd in curl; do
         if ! command -v "$cmd" &>/dev/null; then
             error "'$cmd' is required but not installed."
         fi
@@ -65,16 +68,21 @@ build_from_source() {
     info "No pre-built binary found. Building from source..."
 
     if ! command -v go &>/dev/null; then
-        error "Go is required to build from source. Install it from https://go.dev/dl/"
+        error "Go 1.26.3+ is required to build from source. Install it from https://go.dev/dl/"
+    fi
+    if ! command -v git &>/dev/null; then
+        error "'git' is required to build VX from source when no release binary is available."
     fi
 
     local go_version
-    go_version=$(go version | grep -oE 'go[0-9]+\.[0-9]+' | sed 's/go//')
-    local major minor
-    major=$(echo "$go_version" | cut -d. -f1)
-    minor=$(echo "$go_version" | cut -d. -f2)
-    if [ "$major" -lt 1 ] || ([ "$major" -eq 1 ] && [ "$minor" -lt 22 ]); then
-        error "Go 1.22+ required, found $(go version)"
+    go_version=$(go version | sed -E 's/.*go([0-9]+)\.([0-9]+)(\.([0-9]+))?.*/\1 \2 \4/')
+    local major minor patch
+    read -r major minor patch <<< "$go_version"
+    patch="${patch:-0}"
+    if [ "$major" -lt 1 ] ||
+       ([ "$major" -eq 1 ] && [ "$minor" -lt 26 ]) ||
+       ([ "$major" -eq 1 ] && [ "$minor" -eq 26 ] && [ "$patch" -lt 3 ]); then
+        error "Go 1.26.3+ required, found $(go version)"
     fi
 
     local tmpdir
@@ -130,12 +138,17 @@ download_release() {
 install_binary() {
     local src="$1"
 
+    mkdir -p "$INSTALL_DIR" 2>/dev/null || true
     if [ -w "$INSTALL_DIR" ]; then
         cp "$src" "${INSTALL_DIR}/${BINARY_NAME}"
-    else
-        info "Installing to ${INSTALL_DIR} (requires sudo)..."
+        chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+    elif command -v sudo &>/dev/null; then
+        info "Installing to ${INSTALL_DIR} (requires sudo if the directory is protected)..."
+        sudo mkdir -p "$INSTALL_DIR"
         sudo cp "$src" "${INSTALL_DIR}/${BINARY_NAME}"
         sudo chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+    else
+        error "${INSTALL_DIR} is not writable and sudo is not available. Retry with VX_INSTALL_DIR=\"\$HOME/.local/bin\"."
     fi
 
     ok "VX installed to ${INSTALL_DIR}/${BINARY_NAME}"

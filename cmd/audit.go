@@ -92,11 +92,7 @@ func runAudit(cmd *cobra.Command, args []string) {
 
 	writeAuditReports(result, absPath)
 
-	// CI mode exit code
-	if auditCI && auditMinScore > 0 && result.Score < auditMinScore {
-		fmt.Fprintf(os.Stderr, "FAIL: Score %d < minimum %d\n", result.Score, auditMinScore)
-		os.Exit(1)
-	}
+	failCIIfNeeded(auditCI, auditMinScore, result)
 }
 
 // executeAudit runs all local audit modules and returns a score result.
@@ -120,6 +116,7 @@ func executeAudit(cfg *local.AuditConfig) engine.ScoreResult {
 
 	var (
 		allFindings []engine.Finding
+		allErrors   []engine.ModuleError
 		mu          sync.Mutex
 		wg          sync.WaitGroup
 	)
@@ -137,16 +134,19 @@ func executeAudit(cfg *local.AuditConfig) engine.ScoreResult {
 			findings, err := m.Run(cfg)
 			elapsed := time.Since(modStart)
 
+			mu.Lock()
+			allFindings = append(allFindings, findings...)
+			if err != nil {
+				allErrors = append(allErrors, engine.NewModuleError(m.Name(), err))
+			}
+			mu.Unlock()
+
 			if err != nil {
 				if !auditJSON {
 					fmt.Printf("  [!] %s failed: %v (%s)\n", m.Name(), err, elapsed.Round(time.Millisecond))
 				}
 				return
 			}
-
-			mu.Lock()
-			allFindings = append(allFindings, findings...)
-			mu.Unlock()
 
 			if !auditJSON {
 				fmt.Printf("  [OK] %s done - %d findings (%s)\n", m.Name(), len(findings), elapsed.Round(time.Millisecond))
@@ -161,7 +161,7 @@ func executeAudit(cfg *local.AuditConfig) engine.ScoreResult {
 		fmt.Printf("\n  Audit completed in %s\n\n", elapsed.Round(time.Millisecond))
 	}
 
-	return engine.ComputeScore(allFindings)
+	return engine.ComputePartialScore(allFindings, allErrors)
 }
 
 func writeAuditReports(result engine.ScoreResult, path string) {
@@ -190,17 +190,7 @@ func writeAuditReports(result engine.ScoreResult, path string) {
 		}
 	}
 
-	// Set GitHub Actions outputs if in CI
-	if ghOutput := os.Getenv("GITHUB_OUTPUT"); ghOutput != "" {
-		if f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
-			defer f.Close()
-			fmt.Fprintf(f, "score=%d\n", result.Score)
-			fmt.Fprintf(f, "grade=%s\n", result.Grade)
-			fmt.Fprintf(f, "total-findings=%d\n", len(result.Findings))
-			fmt.Fprintf(f, "critical-findings=%d\n", result.Summary[engine.SevCritical])
-			fmt.Fprintf(f, "high-findings=%d\n", result.Summary[engine.SevHigh])
-		}
-	}
+	writeGithubOutputs(result)
 }
 
 func resolveAbsPath(path string) (string, error) {

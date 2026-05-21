@@ -9,23 +9,23 @@ import (
 	"github.com/MakFly/vx/pkg/config"
 	"github.com/MakFly/vx/pkg/engine"
 	"github.com/MakFly/vx/pkg/history"
-	"github.com/MakFly/vx/pkg/modules"
 	"github.com/MakFly/vx/pkg/report"
 	"github.com/spf13/cobra"
 )
 
 var (
-	scanThreads  int
-	scanTimeout  int
-	scanModules  string
-	scanMinScore int
-	scanJSON     bool
-	scanVerbose  bool
-	scanCI       bool
-	scanSARIF    string
-	scanBadge    string
-	scanMarkdown string
-	scanHTML     string
+	scanThreads    int
+	scanTimeout    int
+	scanModules    string
+	scanMinScore   int
+	scanJSON       bool
+	scanVerbose    bool
+	scanCI         bool
+	scanSARIF      string
+	scanBadge      string
+	scanMarkdown   string
+	scanHTML       string
+	scanAggressive bool
 )
 
 var scanCmd = &cobra.Command{
@@ -39,7 +39,7 @@ var scanCmd = &cobra.Command{
 func init() {
 	scanCmd.Flags().IntVarP(&scanThreads, "threads", "t", 10, "Number of concurrent module threads")
 	scanCmd.Flags().IntVar(&scanTimeout, "timeout", 15, "HTTP request timeout in seconds")
-	scanCmd.Flags().StringVarP(&scanModules, "modules", "m", "", "Comma-separated list of modules to run (default: all)")
+	scanCmd.Flags().StringVarP(&scanModules, "modules", "m", "", "Comma-separated list of modules to run (default: safe module set)")
 	scanCmd.Flags().IntVar(&scanMinScore, "min-score", 0, "Minimum passing score for CI mode (0 = no threshold)")
 	scanCmd.Flags().BoolVar(&scanJSON, "json", false, "Output results as JSON")
 	scanCmd.Flags().BoolVarP(&scanVerbose, "verbose", "v", false, "Verbose output")
@@ -48,6 +48,7 @@ func init() {
 	scanCmd.Flags().StringVar(&scanBadge, "badge", "", "Write shields.io badge JSON to file")
 	scanCmd.Flags().StringVar(&scanMarkdown, "markdown", "", "Write markdown report to file (for PR comments)")
 	scanCmd.Flags().StringVar(&scanHTML, "html", "", "Write HTML report to file")
+	scanCmd.Flags().BoolVar(&scanAggressive, "aggressive", false, "Include intrusive modules: portscan, subdomain, login")
 
 	rootCmd.AddCommand(scanCmd)
 }
@@ -62,21 +63,18 @@ func runScan(cmd *cobra.Command, args []string) {
 	}
 	applyConfigDefaults(fileCfg, cmd)
 
-	// Normalize URL
-	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		target = "https://" + target
-	}
-	target = strings.TrimRight(target, "/")
+	target = normalizeTarget(target)
 
 	cfg := &engine.Config{
 		TargetURL: target,
 		Threads:   scanThreads,
 		Timeout:   time.Duration(scanTimeout) * time.Second,
-		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+		UserAgent: defaultUserAgent,
+		Silent:    scanJSON,
 	}
 
 	if scanModules != "" {
-		cfg.Modules = strings.Split(scanModules, ",")
+		cfg.Modules = splitList(scanModules)
 	}
 
 	// Print banner
@@ -86,24 +84,7 @@ func runScan(cmd *cobra.Command, args []string) {
 
 	// Build engine
 	eng := engine.New(cfg)
-
-	// Register all modules
-	eng.Register(&modules.Headers{})
-	eng.Register(&modules.Cookies{})
-	eng.Register(&modules.Discovery{})
-	eng.Register(&modules.Webservice{})
-	eng.Register(&modules.XSS{})
-	eng.Register(&modules.InfoDisclosure{})
-	eng.Register(&modules.TLS{})
-	eng.Register(&modules.CORS{})
-	eng.Register(&modules.PortScan{})
-	eng.Register(&modules.Subdomain{})
-	eng.Register(&modules.Login{})
-	eng.Register(&modules.HTTPMethods{})
-	eng.Register(&modules.SQLi{})
-	eng.Register(&modules.JSDiscovery{})
-	eng.Register(&modules.OpenRedirect{})
-	eng.Register(&modules.PathTraversal{})
+	registerRemoteModules(eng, scanAggressive || scanModules != "")
 
 	// Run
 	scanStart := time.Now()
@@ -128,7 +109,7 @@ func runScan(cmd *cobra.Command, args []string) {
 	if scanSARIF != "" {
 		if err := report.WriteSARIF(result, scanSARIF); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write SARIF: %v\n", err)
-		} else {
+		} else if !scanJSON {
 			fmt.Printf("  SARIF report written to %s\n", scanSARIF)
 		}
 	}
@@ -136,7 +117,7 @@ func runScan(cmd *cobra.Command, args []string) {
 	if scanBadge != "" {
 		if err := report.WriteBadge(result, scanBadge); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write badge: %v\n", err)
-		} else {
+		} else if !scanJSON {
 			fmt.Printf("  Badge JSON written to %s\n", scanBadge)
 		}
 	}
@@ -145,7 +126,7 @@ func runScan(cmd *cobra.Command, args []string) {
 		md := report.GenerateMarkdown(result, target, nil)
 		if err := os.WriteFile(scanMarkdown, []byte(md), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write markdown: %v\n", err)
-		} else {
+		} else if !scanJSON {
 			fmt.Printf("  Markdown report written to %s\n", scanMarkdown)
 		}
 	}
@@ -154,7 +135,7 @@ func runScan(cmd *cobra.Command, args []string) {
 	if scanHTML != "" {
 		if err := report.WriteHTML(result, target, scanHTML); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write HTML: %v\n", err)
-		} else {
+		} else if !scanJSON {
 			fmt.Printf("  HTML report written to %s\n", scanHTML)
 		}
 	}
@@ -164,23 +145,8 @@ func runScan(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save scan history: %v\n", err)
 	}
 
-	// Set GitHub Actions outputs if in CI
-	if ghOutput := os.Getenv("GITHUB_OUTPUT"); ghOutput != "" {
-		if f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
-			defer f.Close()
-			fmt.Fprintf(f, "score=%d\n", result.Score)
-			fmt.Fprintf(f, "grade=%s\n", result.Grade)
-			fmt.Fprintf(f, "total-findings=%d\n", len(result.Findings))
-			fmt.Fprintf(f, "critical-findings=%d\n", result.Summary[engine.SevCritical])
-			fmt.Fprintf(f, "high-findings=%d\n", result.Summary[engine.SevHigh])
-		}
-	}
-
-	// CI mode exit code
-	if scanCI && scanMinScore > 0 && result.Score < scanMinScore {
-		fmt.Fprintf(os.Stderr, "FAIL: Score %d < minimum %d\n", result.Score, scanMinScore)
-		os.Exit(1)
-	}
+	writeGithubOutputs(result)
+	failCIIfNeeded(scanCI, scanMinScore, result)
 }
 
 // applyConfigDefaults applies vx.yaml values as defaults for flags not explicitly set.

@@ -7,7 +7,7 @@ target: https://your-app.com
 threads: 10
 timeout: 15  # seconds
 
-# Module selection (empty = all)
+# Module selection (empty = safe default modules)
 modules: []
 # modules: [headers, cookies, discovery, webservice, xss, info]
 

@@ -13,8 +13,10 @@ import (
 
 type Discovery struct{}
 
-func (d *Discovery) Name() string        { return "discovery" }
-func (d *Discovery) Description() string { return "Technology fingerprinting, sensitive paths, DNS recon" }
+func (d *Discovery) Name() string { return "discovery" }
+func (d *Discovery) Description() string {
+	return "Technology fingerprinting, sensitive paths, DNS recon"
+}
 
 func (d *Discovery) Run(ctx context.Context, cfg *engine.Config) ([]engine.Finding, error) {
 	client := newHTTPClient(cfg)
@@ -43,26 +45,26 @@ func (d *Discovery) fingerprint(resp *http.Response, body []byte, cfg *engine.Co
 	var techs []string
 
 	patterns := map[string]*regexp.Regexp{
-		"PrestaShop":  regexp.MustCompile(`(?i)prestashop|/modules/ps_|/themes/.*prestashop`),
-		"WordPress":   regexp.MustCompile(`(?i)wp-content|wp-includes|wordpress`),
-		"Drupal":      regexp.MustCompile(`(?i)drupal|sites/default/files`),
-		"Magento":     regexp.MustCompile(`(?i)magento|/skin/frontend|mage/cookies`),
-		"Shopify":     regexp.MustCompile(`(?i)cdn\.shopify\.com|shopify\.com`),
-		"React":       regexp.MustCompile(`(?i)react\.production|__NEXT_DATA__|_next/static`),
-		"Vue.js":      regexp.MustCompile(`(?i)vue\.runtime|__vue__|v-cloak`),
-		"Angular":     regexp.MustCompile(`(?i)ng-version|angular\.min\.js`),
-		"jQuery":      regexp.MustCompile(`(?i)jquery[.-]\d|jquery\.min\.js`),
-		"Bootstrap":   regexp.MustCompile(`(?i)bootstrap\.min\.(css|js)`),
-		"GTM":         regexp.MustCompile(`(?i)googletagmanager\.com/gtm\.js`),
-		"GA":          regexp.MustCompile(`(?i)google-analytics\.com|UA-\d+-\d+|G-[A-Z0-9]+`),
+		"PrestaShop":     regexp.MustCompile(`(?i)prestashop|/modules/ps_|/themes/.*prestashop`),
+		"WordPress":      regexp.MustCompile(`(?i)wp-content|wp-includes|wordpress`),
+		"Drupal":         regexp.MustCompile(`(?i)drupal|sites/default/files`),
+		"Magento":        regexp.MustCompile(`(?i)magento|/skin/frontend|mage/cookies`),
+		"Shopify":        regexp.MustCompile(`(?i)cdn\.shopify\.com|shopify\.com`),
+		"React":          regexp.MustCompile(`(?i)react\.production|__NEXT_DATA__|_next/static`),
+		"Vue.js":         regexp.MustCompile(`(?i)vue\.runtime|__vue__|v-cloak`),
+		"Angular":        regexp.MustCompile(`(?i)ng-version|angular\.min\.js`),
+		"jQuery":         regexp.MustCompile(`(?i)jquery[.-]\d|jquery\.min\.js`),
+		"Bootstrap":      regexp.MustCompile(`(?i)bootstrap\.min\.(css|js)`),
+		"GTM":            regexp.MustCompile(`(?i)googletagmanager\.com/gtm\.js`),
+		"GA":             regexp.MustCompile(`(?i)google-analytics\.com|UA-\d+-\d+|G-[A-Z0-9]+`),
 		"Facebook Pixel": regexp.MustCompile(`(?i)connect\.facebook\.net/.*fbevents|fbq\(`),
-		"Crisp":       regexp.MustCompile(`(?i)crisp\.chat|crisp\.im`),
-		"Hotjar":      regexp.MustCompile(`(?i)static\.hotjar\.com|hj\(`),
-		"Cloudflare":  regexp.MustCompile(`(?i)cloudflare|cf-ray`),
-		"Sendinblue":  regexp.MustCompile(`(?i)sibautomation\.com|sendinblue`),
-		"Stripe":      regexp.MustCompile(`(?i)js\.stripe\.com|stripe\.js`),
-		"reCAPTCHA":   regexp.MustCompile(`(?i)recaptcha/api|grecaptcha`),
-		"LayerSlider": regexp.MustCompile(`(?i)layerslider`),
+		"Crisp":          regexp.MustCompile(`(?i)crisp\.chat|crisp\.im`),
+		"Hotjar":         regexp.MustCompile(`(?i)static\.hotjar\.com|hj\(`),
+		"Cloudflare":     regexp.MustCompile(`(?i)cloudflare|cf-ray`),
+		"Sendinblue":     regexp.MustCompile(`(?i)sibautomation\.com|sendinblue`),
+		"Stripe":         regexp.MustCompile(`(?i)js\.stripe\.com|stripe\.js`),
+		"reCAPTCHA":      regexp.MustCompile(`(?i)recaptcha/api|grecaptcha`),
+		"LayerSlider":    regexp.MustCompile(`(?i)layerslider`),
 	}
 
 	for name, re := range patterns {
@@ -315,13 +317,13 @@ func (d *Discovery) dnsChecks(cfg *engine.Config) []engine.Finding {
 
 	// Dangling CNAME detection — check main domain and www
 	danglingServices := map[string]string{
-		".github.io":                        "GitHub Pages",
-		".herokuapp.com":                    "Heroku",
-		".s3.amazonaws.com":                 "AWS S3",
-		".s3-website-":                      "AWS S3 Website",
-		".myshopify.com":                    "Shopify",
-		".netlify.app":                      "Netlify",
-		".vercel.app":                       "Vercel",
+		".github.io":        "GitHub Pages",
+		".herokuapp.com":    "Heroku",
+		".s3.amazonaws.com": "AWS S3",
+		".s3-website-":      "AWS S3 Website",
+		".myshopify.com":    "Shopify",
+		".netlify.app":      "Netlify",
+		".vercel.app":       "Vercel",
 	}
 	cnameTargets := []string{domain, "www." + domain}
 	for _, target := range cnameTargets {
@@ -359,13 +361,4 @@ func (d *Discovery) dnsChecks(cfg *engine.Config) []engine.Finding {
 	}
 
 	return findings
-}
-
-func extractHost(rawURL string) string {
-	s := rawURL
-	s = strings.TrimPrefix(s, "https://")
-	s = strings.TrimPrefix(s, "http://")
-	s = strings.Split(s, "/")[0]
-	s = strings.Split(s, ":")[0]
-	return s
 }

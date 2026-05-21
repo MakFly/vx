@@ -35,7 +35,7 @@ inputs:
     required: false
     default: '.github/vx-badge.json'
   modules:
-    description: 'Comma-separated list of modules (default: all)'
+    description: 'Comma-separated list of modules (default: safe module set)'
     required: false
     default: ''
   threads:
@@ -63,6 +63,9 @@ outputs:
   high-findings:
     description: 'Number of high findings'
     value: ${{ steps.scan.outputs.high-findings }}
+  partial:
+    description: 'Whether the scan completed partially because one or more modules failed'
+    value: ${{ steps.scan.outputs.partial }}
 
 runs:
   using: 'composite'
@@ -70,7 +73,7 @@ runs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.26.3'
 
     - name: Build VX
       shell: bash
@@ -83,18 +86,22 @@ runs:
       id: scan
       shell: bash
       run: |
-        ARGS="--ci --min-score 0"
-        ARGS="$ARGS --threads ${{ inputs.threads }}"
-        ARGS="$ARGS --sarif vx-results.sarif"
-        ARGS="$ARGS --badge ${{ inputs.badge-path }}"
-        ARGS="$ARGS --markdown vx-report.md"
-        ARGS="$ARGS --json > vx-results.json"
+        args=(
+          --min-score 0
+          --threads "${{ inputs.threads }}"
+          --sarif vx-results.sarif
+          --badge "${{ inputs.badge-path }}"
+          --markdown vx-report.md
+          --json
+        )
 
         if [ -n "${{ inputs.modules }}" ]; then
-          ARGS="$ARGS --modules ${{ inputs.modules }}"
+          args+=(--modules "${{ inputs.modules }}")
         fi
 
-        vx scan ${{ inputs.url }} $ARGS || true
+        vx scan "${{ inputs.url }}" "${args[@]}" > vx-results.json
+      env:
+        VX_ACCEPT_DISCLAIMER: 'true'
 
     - name: Upload SARIF
       if: inputs.upload-sarif == 'true' && always()
@@ -131,6 +138,11 @@ runs:
       run: |
         SCORE="${{ steps.scan.outputs.score }}"
         MIN="${{ inputs.min-score }}"
+        PARTIAL="${{ steps.scan.outputs.partial }}"
+        if [ "$PARTIAL" = "true" ]; then
+          echo "::error::VX Security Scan was incomplete; one or more modules failed"
+          exit 1
+        fi
         if [ "${SCORE:-0}" -lt "${MIN:-70}" ]; then
           echo "::error::VX Security Score ${SCORE} is below minimum ${MIN}"
           exit 1

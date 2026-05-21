@@ -51,9 +51,11 @@ func (e *Engine) Run() (ScoreResult, error) {
 	}
 
 	start := time.Now()
-	fmt.Printf("\n  ⚡ VX Security Scanner v0.1.0\n")
-	fmt.Printf("  Target: %s\n", e.Config.TargetURL)
-	fmt.Printf("  Modules: %d loaded\n\n", len(e.modules))
+	if !e.Config.Silent {
+		fmt.Printf("\n  ⚡ VX Security Scanner v0.1.0\n")
+		fmt.Printf("  Target: %s\n", e.Config.TargetURL)
+		fmt.Printf("  Modules: %d loaded\n\n", len(e.modules))
+	}
 
 	var (
 		allFindings []Finding
@@ -81,7 +83,9 @@ func (e *Engine) Run() (ScoreResult, error) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			fmt.Printf("  [~] Running %s...\n", m.Name())
+			if !e.Config.Silent {
+				fmt.Printf("  [~] Running %s...\n", m.Name())
+			}
 			modStart := time.Now()
 
 			ctx, cancel := context.WithTimeout(context.Background(), defaultModuleTimeout)
@@ -91,9 +95,11 @@ func (e *Engine) Run() (ScoreResult, error) {
 			elapsed := time.Since(modStart)
 
 			if err != nil {
-				fmt.Printf("  [!] %s failed: %v (%s)\n", m.Name(), err, elapsed.Round(time.Millisecond))
+				if !e.Config.Silent {
+					fmt.Printf("  [!] %s failed: %v (%s)\n", m.Name(), err, elapsed.Round(time.Millisecond))
+				}
 				mu.Lock()
-				allErrors = append(allErrors, ModuleError{Module: m.Name(), Err: err})
+				allErrors = append(allErrors, NewModuleError(m.Name(), err))
 				mu.Unlock()
 				return
 			}
@@ -102,18 +108,20 @@ func (e *Engine) Run() (ScoreResult, error) {
 			allFindings = append(allFindings, findings...)
 			mu.Unlock()
 
-			fmt.Printf("  [✓] %s done — %d findings (%s)\n", m.Name(), len(findings), elapsed.Round(time.Millisecond))
+			if !e.Config.Silent {
+				fmt.Printf("  [✓] %s done — %d findings (%s)\n", m.Name(), len(findings), elapsed.Round(time.Millisecond))
+			}
 		}(mod)
 	}
 
 	wg.Wait()
 
 	elapsed := time.Since(start)
-	fmt.Printf("\n  Scan completed in %s\n\n", elapsed.Round(time.Millisecond))
+	if !e.Config.Silent {
+		fmt.Printf("\n  Scan completed in %s\n\n", elapsed.Round(time.Millisecond))
+	}
 
-	result := ComputeScore(allFindings)
-	result.Errors = allErrors
-	return result, nil
+	return ComputePartialScore(allFindings, allErrors), nil
 }
 
 func (e *Engine) shouldRun(m Module) bool {
