@@ -15,7 +15,7 @@ Detect XSS, SQL injection, CORS misconfig, TLS issues, open redirects, path trav
     ╚═══╝  ╚═╝  ╚═╝
 ```
 
-[![Go](https://img.shields.io/badge/Go-1.26.3+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Go](https://img.shields.io/badge/Toolchain-Go_1.26.3+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/MakFly/vx/actions/workflows/ci.yml/badge.svg)](https://github.com/MakFly/vx/actions)
 [![GitHub release](https://img.shields.io/github/v/release/MakFly/vx?include_prereleases&label=release)](https://github.com/MakFly/vx/releases)
@@ -41,34 +41,23 @@ Most web security scanners are slow (Puppeteer-based), bloated (heavy runtimes),
 
 ## Quick Start
 
+Install: `curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash`
+
 ```bash
-# Install from GitHub (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | bash
-
-# Optional: install without sudo
-curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | VX_INSTALL_DIR="$HOME/.local/bin" bash
-
-# Optional: pin a release
-curl -fsSL https://raw.githubusercontent.com/MakFly/vx/main/install.sh | VX_VERSION=v0.1.0 bash
-
-# Or build from source
-git clone https://github.com/MakFly/vx.git
-cd vx && go build -o vx ./main.go
-
 # Remote scan (black-box)
-./vx scan https://example.com
+vx scan https://example.com
 
 # Include intrusive modules (portscan, subdomain, login)
-./vx scan https://example.com --aggressive
+vx scan https://example.com --aggressive
 
 # Local audit (white-box)
-./vx audit ./my-project
+vx audit ./my-project
 
 # Both at once
-./vx full ./my-project --url https://example.com
+vx full ./my-project --url https://example.com
 
 # Interactive mode
-./vx
+vx
 ```
 
 ## Remote Scan -- 16 Modules
