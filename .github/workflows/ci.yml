@@ -14,9 +14,7 @@ jobs:
         with:
           go-version: '1.26.3'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+        run: go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8 run
 
   test:
     runs-on: ubuntu-latest
